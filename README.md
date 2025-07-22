@@ -1,1 +1,61 @@
-# Multi-contrast_INR_MICCAI2025
+# INR meets Multi-Contrast MRI Reconstruction
+
+**Natascha Niessen**, Carolin M. Pirkl, Ana Beatriz Solana, Hannah
+Eichhorn, Veronika Spieker, Wenqi Huang, Tim Sprenger, Marion I.
+Menzel, and Julia A. Schnabel on behalf of the PREDICTOM
+consortium
+
+Accepted at [Reconstruction and Imaging Motion Estimation (RIME) Workshop at MICCAI 2025](https://rime-miccai25.github.io/) | [Link to paper upon publication]
+
+**Abstract:** Multi-contrast MRI sequences allow for the acquisition of
+images with varying tissue contrast within a single scan. The resulting
+multi-contrast images can be used to extract quantitative information on
+tissue microstructure. To make such multi-contrast sequences feasible for
+clinical routine, the usually very long scan times need to be shortened e.g.
+through undersampling in k-space. However, this comes with challenges
+for the reconstruction. In general, advanced reconstruction techniques
+such as compressed sensing or deep learning-based approaches can enable
+the acquisition of high-quality images despite the acceleration.
+In this work, we leverage redundant anatomical information of multi-
+contrast sequences to achieve even higher acceleration rates. We use
+undersampling patterns that capture the contrast information located
+at the k-space center, while performing complementary undersampling
+across contrasts for high frequencies. To reconstruct this highly sparse
+k-space data, we propose an implicit neural representation (INR) net-
+work that is ideal for using the complementary information acquired
+across contrasts as it jointly reconstructs all contrast images. We demon-
+strate the benefits of our proposed INR method by applying it to multi-
+contrast MRI using the MPnRAGE sequence, where it outperforms the
+state-of-the-art parallel imaging compressed sensing (PICS) reconstruc-
+tion method, even at higher acceleration factors.
+
+**Keywords:** Implicit Neural Representation · MRI Reconstruction · Multi-
+Contrast MRI · Quantitative MRI
+
+## Citation
+If you use this code, please cite our paper:
+
+[Citation upon publication]
+
+## Steps to reconstruct your own multi-contrast data
+
+1. Create a virtual environment with the required packages:
+   ```bash
+   conda env create -f inr_env.yml
+   source activate inr_env OR conda activate inr_env
+   ```
+2. Load your data at the top of the **main.py** script. The data is needed in the following format:
+   
+    Vx,Vy,Vz: spatial dimensions  
+    C: coil dimension  
+    N: contrast dimension  
+
+    Coil Sensitivity Maps: csm (Vx, Vy, Vz, C)  
+    Binary brain mask: brain_mask (Vx, Vy, Vz)  
+    K-space data: kspace_loaded (Vx, Vy, Vz, C, N)  
+    Reference Image (e.g. fully sampled inverse FFT reconstruction): reference_img (Vx, Vy, Vz, N)  
+   
+3. Select the undersampling configuration in **configs/config_direct_inr.yaml**.
+   
+4. The last epoch of the self-supervised training serves as inference. The results are saved in **results/direct_inr**.
+   
