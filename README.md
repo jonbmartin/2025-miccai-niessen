@@ -62,5 +62,5 @@ If you use this code, please cite our paper:
 
 ## Illustration of the Multi-Contrast INR Reconstruction framework with complementary undersampling:
 
-![Image]([./Multi-Contrast INR Reconstruction.png](https://github.com/nataschaniessen/Multi-contrast_INR_MICCAI2025/blob/main/Multi-Contrast%20INR%20Reconstruction.png)
+![Image](./Multi-Contrast INR Reconstruction.png](https://github.com/nataschaniessen/Multi-contrast_INR_MICCAI2025/blob/main/Multi-Contrast%20INR%20Reconstruction.png)
    
