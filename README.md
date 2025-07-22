@@ -58,4 +58,9 @@ If you use this code, please cite our paper:
 3. Select the undersampling configuration in **configs/config_direct_inr.yaml**.
    
 4. Run **main.py**. The last epoch of the self-supervised training serves as inference. The results are saved in **results/direct_inr**.
+
+
+## Illustration of the Multi-Contrast INR Reconstruction framework with complementary undersampling:
+
+![](Multi-Contrast INR Reconstruction.png)
    
