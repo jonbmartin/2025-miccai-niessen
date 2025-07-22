@@ -1,0 +1,19 @@
+comments:
+
+method: pics
+data:
+  dataset_name: &dataset_name your_datasetname
+  undersampling:
+    type: poisson #poisson #fullysampled
+    accel: 12.09 #8.07 #4.1 #12.09
+    full_kcenter: 50 #a larger number means less fully sampled k-space center (1:full_kcenter)
+  save_dir: ./results
+
+bart_settings:
+  regularizer: l2
+  r_param: 0.05 #lambda_l2
+  niter: 50
+
+hydra:
+  run:
+    dir: .

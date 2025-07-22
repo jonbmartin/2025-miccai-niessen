@@ -1,0 +1,51 @@
+comments:  
+
+method: direct_inr
+data:
+  dataset_name:  &dataset_name MPnRAGE_volunteer4_compMPRAGE2
+  undersampling:
+    type: fullysampled #poisson #fullysampled
+    accel: 4.1 #8.07 #4.1 #12.09
+    full_kcenter: 50 #bigger number means less fully sampled k-space center (1:full_kcenter)
+  save_dir: ./results
+
+
+network:
+  encoding: hashgrid
+  encoding_params:
+    otype: Grid
+    type: Hash
+    n_levels: 16
+    n_features_per_level: 2
+    log2_hashmap_size: 20
+    base_resolution: 16
+    per_level_scale: 1.26 #1.26, #1.22, #1.32, #1.26 #1.5  16*1.26^15 ~= 512
+    interpolation: linear
+  model_type: mlp
+  in_dim: 2
+  hidden_dims: [64,64]
+
+
+training:
+  opt_type: &opt_type adam
+  train_iters: &train_iters 200
+  train_tol: &train_tol 1e-6
+  train_loss: &train_loss  weighted_k_mse
+  train_lr: &train_lr 1e-2
+  train_batch_size: &train_batch_size  1
+
+
+  train:
+      enabled: false
+      n_epochs: *train_iters
+      batch_size: *train_batch_size
+      loss: 
+        type: *train_loss
+      optimizer:
+        type: *opt_type
+        lr: *train_lr
+      tol: *train_tol
+
+hydra:
+  run:
+    dir: .
