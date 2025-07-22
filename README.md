@@ -57,5 +57,5 @@ If you use this code, please cite our paper:
    
 3. Select the undersampling configuration in **configs/config_direct_inr.yaml**.
    
-4. The last epoch of the self-supervised training serves as inference. The results are saved in **results/direct_inr**.
+4. Run **main.py**. The last epoch of the self-supervised training serves as inference. The results are saved in **results/direct_inr**.
    
