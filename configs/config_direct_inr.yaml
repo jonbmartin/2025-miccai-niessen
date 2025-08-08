@@ -2,7 +2,7 @@ comments:
 
 method: direct_inr
 data:
-  dataset_name:  &dataset_name MPnRAGE_volunteer4_compMPRAGE2
+  dataset_name:  &dataset_name your_datasetname
   undersampling:
     type: fullysampled #poisson #fullysampled
     accel: 4.1 #8.07 #4.1 #12.09
