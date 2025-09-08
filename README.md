@@ -5,7 +5,7 @@ Eichhorn, Veronika Spieker, Wenqi Huang, Tim Sprenger, Marion I.
 Menzel, and Julia A. Schnabel on behalf of the PREDICTOM
 consortium
 
-Accepted at [Reconstruction and Imaging Motion Estimation (RIME) Workshop at MICCAI 2025](https://rime-miccai25.github.io/) | [Link to paper upon publication]
+Accepted at [Reconstruction and Imaging Motion Estimation (RIME) Workshop at MICCAI 2025](https://rime-miccai25.github.io/) | [Link to paper](https://arxiv.org/abs/2509.04888)
 
 **Abstract:** Multi-contrast MRI sequences allow for the acquisition of
 images with varying tissue contrast within a single scan. The resulting
@@ -31,7 +31,15 @@ Contrast MRI · Quantitative MRI
 ## Citation
 If you use this code, please cite our paper:
 
-[Citation upon publication]
+@misc{niessen2025inrmeetsmulticontrastmri,
+      title={INR meets Multi-Contrast MRI Reconstruction}, 
+      author={Natascha Niessen and Carolin M. Pirkl and Ana Beatriz Solana and Hannah Eichhorn and Veronika Spieker and Wenqi Huang and Tim Sprenger and Marion I. Menzel and Julia A. Schnabel},
+      year={2025},
+      eprint={2509.04888},
+      archivePrefix={arXiv},
+      primaryClass={eess.IV},
+      url={https://arxiv.org/abs/2509.04888}, 
+}
 
 ## Steps to reconstruct your own multi-contrast data
 
