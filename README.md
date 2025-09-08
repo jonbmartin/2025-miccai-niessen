@@ -31,6 +31,7 @@ Contrast MRI · Quantitative MRI
 ## Citation
 If you use this code, please cite our paper:
 
+```bash
 @misc{niessen2025inrmeetsmulticontrastmri,
       title={INR meets Multi-Contrast MRI Reconstruction}, 
       author={Natascha Niessen and Carolin M. Pirkl and Ana Beatriz Solana and Hannah Eichhorn and Veronika Spieker and Wenqi Huang and Tim Sprenger and Marion I. Menzel and Julia A. Schnabel},
@@ -40,6 +41,7 @@ If you use this code, please cite our paper:
       primaryClass={eess.IV},
       url={https://arxiv.org/abs/2509.04888}, 
 }
+```
 
 ## Steps to reconstruct your own multi-contrast data
 
