@@ -1,0 +1,42 @@
+comments: null
+method: direct_inr
+data:
+  dataset_name: your_datasetname
+  undersampling:
+    type: fullysampled
+    accel: 4.1
+    full_kcenter: 50
+  save_dir: ./results
+network:
+  encoding: hashgrid
+  encoding_params:
+    otype: Grid
+    type: Hash
+    n_levels: 16
+    n_features_per_level: 2
+    log2_hashmap_size: 20
+    base_resolution: 16
+    per_level_scale: 1.26
+    interpolation: linear
+  model_type: mlp
+  in_dim: 2
+  hidden_dims:
+  - 64
+  - 64
+training:
+  opt_type: adam
+  train_iters: 200
+  train_tol: 1.0e-06
+  train_loss: weighted_k_mse
+  train_lr: 0.01
+  train_batch_size: 1
+  train:
+    enabled: false
+    n_epochs: 200
+    batch_size: 1
+    loss:
+      type: weighted_k_mse
+    optimizer:
+      type: adam
+      lr: 0.01
+    tol: 1.0e-06
