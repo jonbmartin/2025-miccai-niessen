@@ -3,10 +3,10 @@ import numpy as np
 import sys
 import os
 from utils import fft2c_torch, ifft2c_torch
-bartpath = ''
+bartpath = '/home/martijb4@ds.vanderbilt.edu/bart-0.8.00/python'
 sys.path.append(bartpath)
 from bart import bart
-os.environ['TOOLBOX_PATH'] = ''
+os.environ['TOOLBOX_PATH'] = '/home/martijb4@ds.vanderbilt.edu/bart-0.8.00'
 
 
 class PICSReconstructor():
