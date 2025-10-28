@@ -9,38 +9,47 @@ from models.pics import PICSReconstructor
 import sigpy.mri
 import time
 import nibabel
-
+import scipy.io as sio
 
 @hydra.main(version_base=None, config_path='configs', config_name='config_direct_inr')
 
 # Uncomment the following to run the comparison method PICS
-# @hydra.main(version_base=None, config_path='configs', config_name='config_pics')
+#@hydra.main(version_base=None, config_path='configs', config_name='config_pics')
 
 def main(cfg):
 
     # Load your data in the following format
+    #JBM NOTE: assumes that the in-plane sampling direction is the y-z direction 
     '''
     Vx,Vy,Vz: spatial dimensions
     C: coil dimension
-    N: contrast dimension
 
     csm : (Vx, Vy, Vz, C)
     brain_mask : (Vx, Vy, Vz)
     kspace_loaded: (Vx, Vy, Vz, C, N)
     reference_img: (Vx, Vy, Vz, N)
     '''
-
-    csm = [...]
-    brain_mask = [...]
-    kspace_loaded = [...]
-    reference_img = [...]
-
+    
+    # -----------JBM: my code for loading in the required  data ------
+    # Note: some weird axis expansions due to me realizing late that y-z is in-plane
+    dat = sio.loadmat('testdata_INR_multicontrast.mat')
+    csm = np.repeat(np.repeat(dat['csm'][None,:,:,None],2,axis=3),2,axis=0)
+    csm = csm.astype(complex)
+    brain_mask = np.repeat(dat['brain_mask'][None,:,:],2,axis=0)
+    kspace_loaded = np.repeat(np.repeat(dat['ksp'][None,:,:,None,:],2,axis=3),2,axis=0)
+    reference_img = np.repeat(np.squeeze(dat['reference_img'])[None,:,:,:],2,axis=0)
+    print('csm shape = ', np.shape(csm))
+    print('brain_mask shape = ', np.shape(brain_mask))
+    print('kspace shape = ', np.shape(kspace_loaded))
+    print('reference img shape = ', np.shape(reference_img))
+    
 
     # ------------- Perform 1D FFT in kx direction ------------------
     kspace_loaded_torch = torch.tensor(kspace_loaded, dtype=torch.complex64)
     kdim = kspace_loaded_torch.shape
     kspace_FTx_echos = torch.zeros(kdim, dtype=torch.complex64)
     num_echos = kdim[-1]
+    print('num echos = ', num_echos)
 
     for echo in range(num_echos):
         x = torch.fft.ifftshift(kspace_loaded_torch[:,:,:,:,echo], dim=0)
@@ -50,7 +59,8 @@ def main(cfg):
 
     # Get kdim used for individual slice training to create the undersampling mask
     kdim_all = kspace_FTx_echos.shape
-    slice_x = 75
+    slice_x = 0 # JBM was 75
+    print('shape of kdim_all = ', np.shape(kdim_all))
     kspace_oneXslice = kspace_FTx_echos[slice_x,:,:,:,:]
     # Reorder k-space data for training
     kdata = np.transpose(kspace_oneXslice, (3,2,0,1))
@@ -71,7 +81,11 @@ def main(cfg):
         fullcenter_mask = fullysampled_kcenter(undersample_mask,kdim,downsample=cfg.data.undersampling.full_kcenter)
 
         if cfg.data.undersampling.type == 'poisson':
+            print('UNDERSAMPLE MASK SHAPE = ', undersample_mask.shape) # JBM debug
+            print('kdim= ', kdim) # JBM debug
             other_mask = undersampling_PoissonDisk(undersample_mask.shape, kdim, accel=cfg.data.undersampling.accel)
+        elif cfg.data.undersampling.type == 'rosette':
+            other_mask = undersampling_Rosette(undersample_mask.shape, kdim)
         elif cfg.data.undersampling.type == 'fullysampled':
             other_mask = np.ones(kdim,dtype=int)
         else:
@@ -133,12 +147,109 @@ def fullysampled_kcenter(undersample_mask,kdim,downsample):
 def undersampling_PoissonDisk(mask_dim, kdim, accel):
     mask = np.zeros(mask_dim)
     for i in range(kdim[1]):
+        print('shape provided to poisson = ', (kdim[-2],kdim[-1]))
         poisson = sigpy.mri.poisson((kdim[-2],kdim[-1]), accel=accel, calib=(0, 0), seed=i, dtype=int, crop_corner=True)
         broadcasted_poisson = np.broadcast_to(poisson, (mask_dim[0],mask_dim[2],mask_dim[3],mask_dim[4]))
+        print('shape of broadcasted_poisson = ', np.shape(broadcasted_poisson))
+
         mask[:,i,:,:,:] = np.copy(broadcasted_poisson)
 
     return mask
+
+
+def undersampling_Rosette(mask_dim, kdim):
+    """
+    AUTHOR JBM
+    TODO: hard-coded
+    """
+    mask = np.zeros(mask_dim)
+    full_angle = 60
+    delta_angle = 3.75
+    # rotating our shot by a certain % in each contrast 
+    for i in range(kdim[1]):
+        print('shape provided to rosete = ', (kdim[-2],kdim[-1]))
+        kx1, ky1 = generate_rosette_traj(6710//2, 1, 30, 20, 0+ delta_angle*i)
+        mask1 = create_binary_mask_from_rosette(kx1, ky1, 256, 1)
+        kx2, ky2 = generate_rosette_traj(6710//2, 1, 30, 20, 10 + delta_angle*i)
+        mask2 = create_binary_mask_from_rosette(kx2, ky2, 256, 1)
+        kx3, ky3 = generate_rosette_traj(6710//2, 1, 30, 20, 20 + delta_angle*i)
+        mask3 = create_binary_mask_from_rosette(kx3, ky3, 256, 1)
+        kx4, ky4 = generate_rosette_traj(6710//2, 1, 30, 20, 30 + delta_angle*i)
+        mask4 = create_binary_mask_from_rosette(kx4, ky4, 256, 1)
+        full_mask = mask1 + mask2 + mask3 + mask4
+        broadcasted_rosette = np.broadcast_to(full_mask, (mask_dim[0],mask_dim[2],mask_dim[3],mask_dim[4]))
+#         poisson = sigpy.mri.poisson((kdim[-2],kdim[-1]), accel=accel, calib=(0, 0), seed=i, dtype=int, crop_corner=True)
+#         broadcasted_poisson = np.broadcast_to(poisson, (mask_dim[0],mask_dim[2],mask_dim[3],mask_dim[4]))
+        print('shape of broadcasted_rosette = ', np.shape(broadcasted_rosette))
+
+        mask[:,i,:,:,:] = np.copy(broadcasted_rosette)
+
+    return mask
+
+
+def generate_rosette_traj(num_points, k_max, omega1, omega2, angle_deg=0.0):
+    """
+    AUTHOR JBM WITH AI
+    Generates k-space coordinates for a rosette-shaped sampling mask.
+
+    Parameters:
+    - num_points (int): The number of sampling points.
+    - k_max (float): The maximum radius of the k-space trajectory.
+    - omega1 (float): The rapid oscillation frequency.
+    - omega2 (float): The slower rotational frequency.
+
+    Returns:
+    - kx (np.ndarray): The x-coordinates of the k-space trajectory.
+    - ky (np.ndarray): The y-coordinates of the k-space trajectory.
+    """
+    angle_rad = np.deg2rad(angle_deg)
+    cos_theta = np.cos(angle_rad)
+    sin_theta = np.sin(angle_rad)
     
+    
+    # Create a time vector
+    t = np.linspace(0, 2 * np.pi, num_points)
+
+    # Generate the k-space coordinates using the rosette equation
+    kx = k_max * np.sin(omega1 * t) * np.cos(omega2 * t)
+    ky = k_max * np.sin(omega1 * t) * np.sin(omega2 * t)
+    
+    kx_rot = kx * cos_theta - ky * sin_theta
+    ky_rot = kx * sin_theta + ky * cos_theta
+
+    return kx_rot, ky_rot
+    
+    
+def create_binary_mask_from_rosette(kx, ky, image_size=256, k_range=1.0):
+    """
+    AUTHOR JBM WITH AI
+    Creates a binary mask from the rosette trajectory by discretizing
+    the k-space points onto a grid.
+
+    Parameters:
+    - kx (np.ndarray): The x-coordinates of the k-space trajectory.
+    - ky (np.ndarray): The y-coordinates of the k-space trajectory.
+    - image_size (int): The size of the final binary mask.
+    - k_range (float): The range of kx and ky (e.g., from -k_range to k_range).
+
+    Returns:
+    - binary_mask (np.ndarray): The binary mask.
+    """
+
+    binary_mask = np.zeros((image_size, image_size), dtype=bool)
+
+    # Scale the k-space points to pixel coordinates
+    pixel_kx = ((kx / k_range + 1) / 2 * (image_size - 1)).astype(int)
+    pixel_ky = ((ky / k_range + 1) / 2 * (image_size - 1)).astype(int)
+
+    # Clip coordinates to be within the image boundaries
+    pixel_kx = np.clip(pixel_kx, 0, image_size - 1)
+    pixel_ky = np.clip(pixel_ky, 0, image_size - 1)
+
+    # Set the corresponding pixels in the binary mask to True
+    binary_mask[pixel_ky, pixel_kx] = True
+
+    return binary_mask
 
 
 def load_sliceData(cfg,csm,reference_img,kspace_FTx_echos,R_accel,undersample_mask,slice_x, brain_mask):
@@ -151,7 +262,8 @@ def load_sliceData(cfg,csm,reference_img,kspace_FTx_echos,R_accel,undersample_ma
     kdata = np.transpose(kspace_oneXslice, (3,2,0,1))
     kdata = kdata[None,:,:,:,:] / np.abs(kspace_FTx_echos).max()*100 # k-space normalization (same for all slices)
     kdim = kspace_FTx_echos.shape
-
+    
+    print('shape of mask in load_sliceData():', np.shape(undersample_mask))
     kdata = kdata * undersample_mask # (1,num_TIs,num_coils,Vy,Vz)
 
     Xslice_size = [kdim[1],kdim[2]]

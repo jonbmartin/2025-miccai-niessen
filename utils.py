@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-#import torchkbnufft as tkbn
+import torchkbnufft as tkbn
 from typing import OrderedDict
 import yaml
 import wandb
@@ -17,6 +17,22 @@ def fft2c_torch(data, dim=(-2, -1)):
 
 def ifft2c_torch(data, dim=(-2, -1)):
     return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), norm='ortho', dim=dim), dim=dim)
+    #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
+    
+def inufft2c_torch(data, ktraj, sens, dim=(-2, -1)):
+    # JBM implemented
+    inufft_ob = tkbn.KbNufftAdjoint(im_size=dim)
+    image = inufft_ob(data, ktraj, smaps=sens, norm='ortho')
+    print('inufft Not tested')
+    return image
+    #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
+
+def nufft2c_torch(data, ktraj, sens, dim=(-2, -1)):
+    # JBM implemented
+    nufft_ob = tkbn.KbNufft(im_size=dim)
+    kdata = nufft_ob(data, ktraj, smaps=sens, norm='ortho')
+    print('nufft Not tested')
+    return kdata
     #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
 
 def fft1c_np(data, dim=-1):
