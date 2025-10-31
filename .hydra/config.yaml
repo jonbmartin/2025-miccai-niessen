@@ -3,9 +3,9 @@ method: direct_inr
 data:
   dataset_name: your_datasetname
   undersampling:
-    type: fullysampled
+    type: rosette
     accel: 4.1
-    full_kcenter: 50
+    full_kcenter: 100
   save_dir: ./results
 network:
   encoding: hashgrid
@@ -25,14 +25,14 @@ network:
   - 64
 training:
   opt_type: adam
-  train_iters: 200
+  train_iters: 100
   train_tol: 1.0e-06
   train_loss: weighted_k_mse
   train_lr: 0.01
   train_batch_size: 1
   train:
     enabled: false
-    n_epochs: 200
+    n_epochs: 100
     batch_size: 1
     loss:
       type: weighted_k_mse
