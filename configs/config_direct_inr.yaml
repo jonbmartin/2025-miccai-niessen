@@ -28,7 +28,7 @@ network:
 
 training:
   opt_type: &opt_type adam
-  train_iters: &train_iters 200
+  train_iters: &train_iters 100 # was 200
   train_tol: &train_tol 1e-6
   train_loss: &train_loss  weighted_k_mse
   train_lr: &train_lr 1e-2

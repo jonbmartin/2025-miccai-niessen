@@ -3,7 +3,7 @@ import numpy as np
 import torchkbnufft as tkbn
 from typing import OrderedDict
 import yaml
-import wandb
+# import wandb
 
 def fft2c_np(data, dim=(-2, -1)):
     return np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(data, axes=dim), norm='ortho', axes=dim), axes=dim)
@@ -19,22 +19,22 @@ def ifft2c_torch(data, dim=(-2, -1)):
     return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), norm='ortho', dim=dim), dim=dim)
     #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
     
-def inufft2c_torch(data, ktraj, sens, dim=(-2, -1)):
+def inufft2c_torch(data, ktraj, sens, dim):
     # JBM implemented
-    inufft_ob = tkbn.KbNufftAdjoint(im_size=dim)
+    inufft_ob = tkbn.KbNufftAdjoint(im_size=(dim,dim),)
     image = inufft_ob(data, ktraj, smaps=sens, norm='ortho')
-    print('inufft Not tested')
+#     print('inufft Not tested')
     return image
     #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
 
-def nufft2c_torch(data, ktraj, sens, dim=(-2, -1)):
+def nufft2c_torch(data, ktraj, sens, dim, device):
     # JBM implemented
-    nufft_ob = tkbn.KbNufft(im_size=dim)
+    nufft_ob = tkbn.KbNufft(im_size=(dim,dim),device=device)
     kdata = nufft_ob(data, ktraj, smaps=sens, norm='ortho')
-    print('nufft Not tested')
+#     print('nufft Not tested')
     return kdata
     #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
-
+    
 def fft1c_np(data, dim=-1):
     return np.fft.fftshift(np.fft.fft(np.fft.ifftshift(data, axes=dim), norm='ortho', axis=dim), axes=dim)
 
@@ -151,6 +151,7 @@ class NUFFTAdjoint(torch.nn.Module):
         """
         # get the first few dimensions of the input tensor and treat them as the batch dimensions
         batch_dims = input.shape[:-2]
+        print('batch dims =', batch_dims)
         input = input.view(-1, *input.shape[-2:])   # (nbatch, nc, nSpokes*nFE)
         smaps = smaps.view(-1, *smaps.shape[-3:])   # (nbatch, nc, nx, ny)
         ktraj = ktraj.view(-1, *ktraj.shape[-2:])   # (nbatch, 2, nspokes*nFE)
@@ -162,7 +163,8 @@ class NUFFTAdjoint(torch.nn.Module):
         # - smaps: sensitivity maps, (nbatch, nc, nx, ny), nbatch can be 1 if the sensitivity maps are the same for all slices
         # - dcomp: density compensation, (nbatch, 1, nspokes*nFE)
         # the output is the image data, (nbatch, 1, nx, ny), 1 is the number of coils (already combined)
-        out = self.adjnufft_op(input * torch.sqrt(dcomp), ktraj, smaps=smaps, norm='ortho') # (nbatch, 1, nx, ny)
+#         out = self.adjnufft_op(input * torch.sqrt(dcomp), ktraj, smaps=smaps, norm='ortho') # (nbatch, 1, nx, ny)
+        out = self.adjnufft_op(input * dcomp, ktraj, smaps=smaps, norm='ortho') # (nbatch, 1, nx, ny)
 
         # reshape the output to the original shape
         out = out.view(*batch_dims, *out.shape[-3:])    # (..., 1, nx, ny)
@@ -175,39 +177,39 @@ def read_yaml_to_dict(file_path):
     return config
 
 
-def ndarray2video(data, range=(0,1), fps=10, format='gif'):
-    r"""
-    Convert a 3D numpy array to a wandb video object
-    Args:
-        data (np.ndarray): 3D numpy array, (nt, nx, ny) or (nt, nc, nx, ny) for color images
-        range (tuple): the normalized range of the data, (min, max)
-        fps (int): frame per second
-        format (str): the format of the video, 'gif' or 'mp4'
-    Returns:
-        video: wandb.Video object
-    """
-    if isinstance(data, torch.Tensor):
-        data = data.detach().cpu().numpy()
-    if data.dtype == np.complex64 or data.dtype == np.complex128:
-        data = np.abs(data)
-    if len(data.shape) == 3:
-        data = np.expand_dims(data, axis=1)
+# def ndarray2video(data, range=(0,1), fps=10, format='gif'):
+#     r"""
+#     Convert a 3D numpy array to a wandb video object
+#     Args:
+#         data (np.ndarray): 3D numpy array, (nt, nx, ny) or (nt, nc, nx, ny) for color images
+#         range (tuple): the normalized range of the data, (min, max)
+#         fps (int): frame per second
+#         format (str): the format of the video, 'gif' or 'mp4'
+#     Returns:
+#         video: wandb.Video object
+#     """
+#     if isinstance(data, torch.Tensor):
+#         data = data.detach().cpu().numpy()
+#     if data.dtype == np.complex64 or data.dtype == np.complex128:
+#         data = np.abs(data)
+#     if len(data.shape) == 3:
+#         data = np.expand_dims(data, axis=1)
     
-    # normalize the data
-    data /= data.max()
-    data = (data - range[0]) / (range[1] - range[0])
-    data = np.clip(data, 0, 1)
+#     # normalize the data
+#     data /= data.max()
+#     data = (data - range[0]) / (range[1] - range[0])
+#     data = np.clip(data, 0, 1)
 
-    # convert the data to uint8
-    data = (data * 255).astype(np.uint8)
+#     # convert the data to uint8
+#     data = (data * 255).astype(np.uint8)
 
-    # expand the color channel when it's 1
-    if data.shape[1] == 1:
-        data = np.repeat(data, 3, axis=1)
+#     # expand the color channel when it's 1
+#     if data.shape[1] == 1:
+#         data = np.repeat(data, 3, axis=1)
 
-    # create a video
-    video = wandb.Video(data, fps=fps, format=format)
-    return video
+#     # create a video
+#     video = wandb.Video(data, fps=fps, format=format)
+#     return video
 
 
 

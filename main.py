@@ -268,7 +268,10 @@ def load_sliceData(cfg,csm,reference_img,kspace_FTx_echos,R_accel,undersample_ma
 
     Xslice_size = [kdim[1],kdim[2]]
     out_dim = kdim[-1]
-
+    print('JBM: out_dim = ', out_dim)
+    print('JBM: load_sliceData() shape of kdata: ', np.shape(kdata))
+    print('JBM: load_sliceData() shape of csm: ', np.shape(csm))
+    
     data = {
         'kdata': kdata,
         'csm': csm,
