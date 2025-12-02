@@ -127,9 +127,10 @@ def main(cfg):
 
     # ---------------- INR training and inference for all slices ----------------
     
-    # THIS IS THE CORE FUNCTION. DONT NEED ANYTHING ABOVE IT 
+    # JBM THIS IS THE CORE FUNCTION. DONT NEED ANYTHING ABOVE IT 
 #     img_allSlices = np.zeros((kdim_all[0],kdim_all[1],kdim_all[2],kdim_all[4]))
     img_allSlices = np.zeros((1,10,100,100)) # Nslices, Ncontrasts, Nx, Ny
+    img_allSlicesCplx = np.zeros((1,10,100,100), dtype=complex) # Nslices, Ncontrasts, Nx, Ny
     time0 = time.time()
 
     for slice in range(1):
@@ -144,6 +145,7 @@ def main(cfg):
         time2 = time.time()
 
         img_allSlices[slice,:,:,:] = np.transpose(np.abs(img_slice), axes=(2,0,1))
+        img_allSlicesCplx[slice,:,:,:] = np.transpose(img_slice, axes=(2,0,1)) # JBM just doing extra saving
 
 
     print("Time for one slice:", (time2 - time1))
@@ -154,6 +156,8 @@ def main(cfg):
 
     nifti_file = nibabel.Nifti1Image(np.abs(img_allSlices), affine=None)
     nibabel.save(nifti_file, save_dir + '/' + data['runname'] + '.nii.gz')
+    # JBM also just saving it the way I prefer, MATLAB file: 
+    sio.savemat(save_dir + '/' + data['runname'] + '.mat', {'cplx_img':img_allSlicesCplx})
 
 
 def fullysampled_kcenter(undersample_mask,kdim,downsample):
