@@ -35,9 +35,9 @@ class WeightedKspaceMSELoss(nn.Module):
         return loss
 
     
-class UnWeightedKspaceMSELossNonCart(nn.Module):
+class WeightedKspaceMSELossNonCart(nn.Module):
     def __init__(self, im_size, device='cuda'):
-        super(UnWeightedKspaceMSELossNonCart, self).__init__()
+        super(WeightedKspaceMSELossNonCart, self).__init__()
         # Calculate distance from the center for each point in the Cartesian grid
         y = torch.linspace(-1, 1, im_size[0], device=device)
         z = torch.linspace(-1, 1, im_size[1], device=device)
@@ -62,7 +62,7 @@ class UnWeightedKspaceMSELossNonCart(nn.Module):
         print('weight shape = ', np.shape(weight))
         loss = 0
         device = img_pred.get_device()
-        for ii in range(10):
+        for ii in range(9): # JBM TODO hardcoded number of contrasts
             contrast_img = torch.squeeze(img_pred[:,:,ii])[None,None,:,:]/1000 # JBM try this neext??#
 #             contrast_img = torch.squeeze(img_pred[:,:,ii]) # JBM try this neext??#
 
@@ -122,6 +122,7 @@ class MLP(nn.Module):
         x = self.model(x)
         return torch.view_as_complex(x.reshape(x.shape[:-1] + (-1, 2)))
 
+
 class tcnnHashgridEncoder(nn.Module):
     def __init__(self, dim, encoding_config):
         super().__init__()
@@ -143,7 +144,6 @@ class tcnnHashgridEncoder(nn.Module):
         return x
 
 
-
 def get_model(in_dim, out_dim, encoding, model_type, hidden_dims):
     if encoding == 'hashgrid':
         #if in_dim == 2
@@ -154,12 +154,22 @@ def get_model(in_dim, out_dim, encoding, model_type, hidden_dims):
             "n_features_per_level": 2,
             "log2_hashmap_size": 20,
             "base_resolution": 16,
-            "per_level_scale": 1.26, #1.26, #1.22, #1.32, #1.26 #1.5  16*1.26^15 ~= 512
+            "per_level_scale": 1.22, #1.26, #1.22, #1.32, #1.26 #1.5  16*1.26^15 ~= 512
             "interpolation": "linear"
         }
+        # encoding_config =  {"otype": "Frequency",
+        #     "n_frequencies": 64 
+        # }
+        # encoding_config =  {"otype": "OneBlob",
+        #     "n_bins": 32 
+        # }
+
+
         encoder = tcnnHashgridEncoder(in_dim, encoding_config)
     elif encoding == 'none':
         encoder = NoneEncoder(in_dim)
+    elif encoding == 'fourier':
+        raise ValueError("Fourier encoding not yet implemented.")
     else:
         raise ValueError(f"Encoding type {encoding} is not supported.")
     enc_dim = encoder.output_dim
@@ -195,7 +205,8 @@ class DirectINRReconstructor():
         self.loss = self._get_loss(cfg.training.train.loss)
         self.optimizer = self._get_optimizer(
             cfg.training.train.optimizer.type, self.model,
-            lr=cfg.training.train.optimizer.lr)
+            lr=cfg.training.train.optimizer.lr,
+            weight_decay=cfg.training.train.optimizer.weight_decay)
 
 
     def _build_model(self, cfg):
@@ -222,23 +233,24 @@ class DirectINRReconstructor():
             raise ValueError(f"Loss {loss_cfg.type} is not supported.")
 
         
-    def _get_optimizer(self, opt_type, model, lr):
+    def _get_optimizer(self, opt_type, model, lr, weight_decay=0.0):
         r"""
         Get optimizer for the model.
         Args:
             type (str): optimizer type.
             model (nn.Module or list of nn.Module): model to optimize.
             lr (float or list of float): learning rate.
+            weight_decay (float or list of floats): weight decay, l2 reg
         Returns:
             torch.optim.Optimizer: optimizer.
         """
         if type(lr) == list:
             assert len(lr) == len(model) # different lr for spatial and temporal
-            params = [{'params': m.parameters(), 'lr': lr} for m, lr in zip(model, lr)]
+            params = [{'params': m.parameters(), 'lr': lr, 'weight_decay': weight_decay} for m, lr, weight_decay in zip(model, lr, weight_decay)]
         elif type(model) == List:
-            params = [{'params': m.parameters(), 'lr': lr} for m in model]
+            params = [{'params': m.parameters(), 'lr': lr, 'weight_decay': weight_decay} for m in model]
         else:
-            params = [{'params': model.parameters(), 'lr': lr}]
+            params = [{'params': model.parameters(), 'lr': lr, 'weight_decay': weight_decay}]
 
         if opt_type == 'adam':
             return torch.optim.Adam(params)
@@ -371,7 +383,8 @@ class DirectINRReconstructorNonCart():
         self.loss = self._get_loss(cfg.training.train.loss)
         self.optimizer = self._get_optimizer(
             cfg.training.train.optimizer.type, self.model,
-            lr=cfg.training.train.optimizer.lr)
+            lr=cfg.training.train.optimizer.lr,
+            weight_decay=cfg.training.train.optimizer.weight_decay)
 
 
     def _build_model(self, cfg):
@@ -393,28 +406,29 @@ class DirectINRReconstructorNonCart():
             Loss: loss object.
         """
         if loss_cfg.type == 'weighted_k_mse':
-            return UnWeightedKspaceMSELossNonCart(self.im_size)
+            return WeightedKspaceMSELossNonCart(self.im_size)
         else:
             raise ValueError(f"Loss {loss_cfg.type} is not supported.")
 
         
-    def _get_optimizer(self, opt_type, model, lr):
+    def _get_optimizer(self, opt_type, model, lr, weight_decay=0.0):
         r"""
         Get optimizer for the model.
         Args:
             type (str): optimizer type.
             model (nn.Module or list of nn.Module): model to optimize.
             lr (float or list of float): learning rate.
+            weight_decay (float or list of floats): weight decay, l2 reg
         Returns:
             torch.optim.Optimizer: optimizer.
         """
         if type(lr) == list:
             assert len(lr) == len(model) # different lr for spatial and temporal
-            params = [{'params': m.parameters(), 'lr': lr} for m, lr in zip(model, lr)]
+            params = [{'params': m.parameters(), 'lr': lr, 'weight_decay': weight_decay} for m, lr, weight_decay in zip(model, lr, weight_decay)]
         elif type(model) == List:
-            params = [{'params': m.parameters(), 'lr': lr} for m in model]
+            params = [{'params': m.parameters(), 'lr': lr, 'weight_decay': weight_decay} for m in model]
         else:
-            params = [{'params': model.parameters(), 'lr': lr}]
+            params = [{'params': model.parameters(), 'lr': lr, 'weight_decay': weight_decay}]
 
         if opt_type == 'adam':
             return torch.optim.Adam(params)
@@ -426,6 +440,7 @@ class DirectINRReconstructorNonCart():
             return torch.optim.Adamax(params)
         else:
             raise ValueError(f"Optimizer {opt_type} is not supported.")
+        
 
     def _get_img(self, grid, nTI):
         grid_batch_size = grid.shape[:-1]
@@ -459,11 +474,11 @@ class DirectINRReconstructorNonCart():
         val_im_size = self.im_size
 
 #         batch_dim, nTI, nc, Vy, Vz = self.kdata.shape
-        batch_dim, nTI, nc, Vy, Vz = 1, 10, 1, 100, 100 # JBM hardcoded
+        batch_dim, nTI, nc, Vy, Vz = 1, 9, 1, 100, 100 # TODO: JBM hardcoded
         n_iter_per_epoch = int(np.ceil(batch_size / batch_size))
         scale = 1
 
-        # JBM an image-space grid. Not sure why 2? But fixed. 
+        # JBM an image-space grid. Not sure why 2? But fixed. Is this real/imag?
         grid = torch.stack(torch.meshgrid(
                 torch.linspace(-1, 1, int(Vy*scale)+1, device=self.kdata.device)[:-1], 
                 torch.linspace(-1, 1, int(Vz*scale)+1, device=self.kdata.device)[:-1], indexing='ij'), dim=-1)  # (nx, Vy, 2)

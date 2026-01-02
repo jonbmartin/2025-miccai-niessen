@@ -21,8 +21,10 @@ network:
   model_type: mlp
   in_dim: 2
   hidden_dims:
-  - 64
-  - 64
+  - 128
+  - 128
+  - 128
+  - 128
 training:
   opt_type: adam
   train_iters: 300
@@ -30,6 +32,7 @@ training:
   train_loss: weighted_k_mse
   train_lr: 0.01
   train_batch_size: 1
+  weight_decay: 0
   train:
     enabled: false
     n_epochs: 300
@@ -39,4 +42,5 @@ training:
     optimizer:
       type: adam
       lr: 0.01
+      weight_decay: 0
     tol: 1.0e-06

@@ -128,13 +128,20 @@ def main(cfg):
     # ---------------- INR training and inference for all slices ----------------
     
     # JBM THIS IS THE CORE FUNCTION. DONT NEED ANYTHING ABOVE IT 
-#     img_allSlices = np.zeros((kdim_all[0],kdim_all[1],kdim_all[2],kdim_all[4]))
-    img_allSlices = np.zeros((1,10,100,100)) # Nslices, Ncontrasts, Nx, Ny
-    img_allSlicesCplx = np.zeros((1,10,100,100), dtype=complex) # Nslices, Ncontrasts, Nx, Ny
+    img_allSlices = None
+    img_allSlicesCplx = None
     time0 = time.time()
 
     for slice in range(1):
         data = load_sliceDataNonCart()
+        # create output containers once we know dimensions
+        if img_allSlices is None:
+            Nslices = 1
+            Ncontrasts = data['out_dim']
+            print('Ncontrasts = ', Ncontrasts)
+            Nx, Ny = data['im_size']
+            img_allSlices = np.zeros((Nslices, Ncontrasts, Nx, Ny))
+            img_allSlicesCplx = np.zeros((Nslices, Ncontrasts, Nx, Ny), dtype=complex)
         time1 = time.time()
         if cfg.method == 'pics':
             reconstructor = PICSReconstructor(data,cfg)
@@ -154,7 +161,8 @@ def main(cfg):
     save_dir = f"{cfg.data.save_dir}/{cfg.method}"
     os.makedirs(save_dir, exist_ok=True)
 
-    nifti_file = nibabel.Nifti1Image(np.abs(img_allSlices), affine=None)
+    # use a valid affine (avoid passing None)
+    nifti_file = nibabel.Nifti1Image(np.abs(img_allSlices), affine=np.eye(4))
     nibabel.save(nifti_file, save_dir + '/' + data['runname'] + '.nii.gz')
     # JBM also just saving it the way I prefer, MATLAB file: 
     sio.savemat(save_dir + '/' + data['runname'] + '.mat', {'cplx_img':img_allSlicesCplx})
@@ -207,29 +215,43 @@ def load_sliceData(cfg,csm,reference_img,kspace_FTx_echos,R_accel,undersample_ma
     return data
 
 
-def load_sliceDataNonCart():
+def load_sliceDataNonCart(dataset_name='tubes'):
     # my custom-defined bins
-    rosdat = sio.loadmat('data/rosette_ferret_data_NOVD_7T.mat')
+    if dataset_name == 'ferret':
+        rosdat = sio.loadmat('data/rosette_ferret_data_NOVD_7T.mat')
+        bin_bots = [12, 80, 144, 208, 270, 334, 398, 462, 526, 594] 
+        Ro_len = 68 
+        Nshots = 40
+    elif dataset_name == 'tubes':
+        rosdat = sio.loadmat('data/rosette_raw_data_tubes_reformatted.mat')
+        bin_bots = [37, 371, 704, 1037, 1365, 1700, 2029, 2362, 2677] 
+        Ro_len = 333 
+        Nshots = 98
+        shot_skip = 7 # for debugging: use every nth shot
+    else:
+        print('Invalid dataset provided to load_sliceDataNonCart()')
+        return
+    
+    shot_idx = np.arange(0, Nshots, max(1, int(shot_skip)), dtype=np.int64)
+    nshots_sel = shot_idx.size
+    print(f"Shot subsampling: original={Nshots}, shot_skip={shot_skip}, selected={nshots_sel}")
 
-    bin_bots = [12, 80, 144, 208, 270, 334, 398, 462, 526, 594] 
-    Ro_len = 68 
-    Nshots = 40
     bin_tops = [x+Ro_len for x in bin_bots]
     dim = 100
     Ncontrast = len(bin_bots)
     
-    all_sigI = torch.zeros(Ncontrast,Ro_len*Nshots, dtype=torch.cdouble)
-    all_omega = torch.zeros(Ncontrast,2,Ro_len*Nshots)
-    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*Nshots, dtype=torch.cdouble)
+    all_sigI = torch.zeros(Ncontrast,Ro_len*nshots_sel, dtype=torch.cdouble)
+    all_omega = torch.zeros(Ncontrast,2,Ro_len*nshots_sel)
+    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*nshots_sel, dtype=torch.cdouble)
 
     
     for ii in range(len(bin_bots)):
         print('Calc. density comp for segment: ', ii+1)
         tbot,ttop = bin_bots[ii],bin_tops[ii]
 
-        kx = torch.from_numpy(rosdat['kxI'])[tbot:ttop,:]
-        ky = torch.from_numpy(rosdat['kyI'])[tbot:ttop,:]
-        sigI = torch.from_numpy(rosdat['sigI'])[tbot:ttop,:]
+        kx = torch.from_numpy(rosdat['kxI'])[tbot:ttop,shot_idx]
+        ky = torch.from_numpy(rosdat['kyI'])[tbot:ttop,shot_idx]
+        sigI = torch.from_numpy(rosdat['sigI'])[tbot:ttop,shot_idx]
         omega = torch.stack((ky.flatten(),kx.flatten()),dim=0)
         omega = omega*2*torch.pi
         sigI = sigI.flatten()[None,None,:].type(torch.cdouble)
@@ -273,7 +295,7 @@ def load_sliceDataNonCart():
         'brain_mask': None, # don't need
         'reference_img': None, # don't need
         'undersample_mask': None, # delete
-        'runname': 'JBM_testing_noncart',
+        'runname': 'JBM_testing_noncart_7skip_LARGE_REG',
         'slice_x': 0,
         'im_size': [100,100],
         'out_dim': out_dim,

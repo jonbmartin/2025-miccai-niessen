@@ -10,6 +10,7 @@ data:
   save_dir: ./results
 
 
+# JBM note: I think these get overwritten later 
 network:
   encoding: hashgrid
   encoding_params:
@@ -19,11 +20,13 @@ network:
     n_features_per_level: 2
     log2_hashmap_size: 20
     base_resolution: 16
-    per_level_scale: 1.26 #1.26, #1.22, #1.32, #1.26 #1.5  16*1.26^15 ~= 512
+    per_level_scale: 1.26 #(default), #1.22, #1.32, #1.26 #1.5  16*1.26^15 ~= 512
     interpolation: linear
   model_type: mlp
   in_dim: 2
-  hidden_dims: [64,64]
+  hidden_dims: [128, 128, 128, 128] # NOTE: models can stall out for up to a couple of hundred epochs
+  # hidden_dims: [256, 256, 256, 256, 256]
+
 
 
 training:
@@ -33,6 +36,9 @@ training:
   train_loss: &train_loss  weighted_k_mse
   train_lr: &train_lr 1e-2
   train_batch_size: &train_batch_size  1
+  weight_decay: &weight_decay 0 # TODO: this seems to be broken for larger values? 
+  # stalls out at values that I was able to get it to perform ok at by just hard-coding
+  # weight decay in _get_optimizer() in direct_inr.py
 
 
   train:
@@ -44,6 +50,7 @@ training:
       optimizer:
         type: *opt_type
         lr: *train_lr
+        weight_decay: *weight_decay
       tol: *train_tol
 
 hydra:
