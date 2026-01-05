@@ -151,6 +151,7 @@ def main(cfg):
             img_slice = reconstructor.run(cfg.training.train)
         time2 = time.time()
 
+        print('output image slice = ', np.shape(img_slice))
         img_allSlices[slice,:,:,:] = np.transpose(np.abs(img_slice), axes=(2,0,1))
         img_allSlicesCplx[slice,:,:,:] = np.transpose(img_slice, axes=(2,0,1)) # JBM just doing extra saving
 
@@ -223,6 +224,7 @@ def load_sliceDataNonCart(dataset_name='tubes'):
         Ro_len = 68 
         Nshots = 40
         csm = None
+        dim = 100
     elif dataset_name == 'tubes':
         rosdat = sio.loadmat('data/rosette_raw_data_tubes_reformatted.mat')
         bin_bots = [37, 371, 704, 1037, 1365, 1700, 2029, 2362, 2677] 
@@ -230,21 +232,27 @@ def load_sliceDataNonCart(dataset_name='tubes'):
         Nshots = 98
         csm = None
         shot_skip = 7 # for debugging: use every nth shot
+        dim = 100
     elif dataset_name == 'lungUTE':
         mydat = sio.loadmat('data/INR_SISO_data_for_niessen.mat')
         bin_bots = [0] # this dataset, we are just reconstructing a single contrast
         Ro_len = 501 
         Nshots = 120
-        csm = None # TODO: get csm here.
         shot_skip = 1 # for debugging: use every nth shot
-
+        dim = 300
         # JBM: defining a dictionary similar to rosdat for compatibility
         rosdat = {}
-        rosdat['kxI'] = mydat['kx_in'] # (Ro_len, Nshots)
-        rosdat['kyI'] = mydat['ky_in'] # (Ro_len, Nshots)
-        slice_idx = 60 # middle slice
-        rosdat['sigI'] = mydat['kspace_3d_in'][:,:,slice_idx,:,:] # given as (Ro_len, Nshots, Nslice, 1, Ncoils)
-        rosdat['csm'] = mydat['sens_map'][:,:,slice_idx,:,:] # given as (Nx, Ny, Nslice, 1, Ncoils)
+        # JBM know that theese coordinates are not-normalized, so normalizing here
+        # JBM: experimentally realized that I also needed a factor of 2 division. was too small
+        rosdat['kxI'] = mydat['kx_in']/150/2 # (Ro_len, Nshots)
+        rosdat['kyI'] = mydat['ky_in']/150/2 # (Ro_len, Nshots)
+        slice_idx = 45 # middle slice
+        nslices = 20
+        coil_idx = 3 # JBM first coil. will need to extend to multi-coil later
+        csm = mydat['sens_map'][:,:,slice_idx:slice_idx+nslices,0,coil_idx] # (Nx, Ny), coil 1, slice 65
+        csm = torch.from_numpy(csm)
+        rosdat['sigI'] = np.squeeze(mydat['kspace_3d_in'][:,:,slice_idx+nslices,:,coil_idx]) # given as (Ro_len, Nshots, Nslice, 1, Ncoils)
+        # rosdat['csm'] = mydat['sens_map'][:,:,slice_idx,:,:] # given as (Nx, Ny, Nslice, 1, Ncoils)
     else:
         print('Invalid dataset provided to load_sliceDataNonCart()')
         return
@@ -254,12 +262,11 @@ def load_sliceDataNonCart(dataset_name='tubes'):
     print(f"Shot subsampling: original={Nshots}, shot_skip={shot_skip}, selected={nshots_sel}")
 
     bin_tops = [x+Ro_len for x in bin_bots]
-    dim = 100
     Ncontrast = len(bin_bots)
     
-    all_sigI = torch.zeros(Ncontrast,Ro_len*nshots_sel, dtype=torch.cdouble)
-    all_omega = torch.zeros(Ncontrast,2,Ro_len*nshots_sel)
-    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*nshots_sel, dtype=torch.cdouble)
+    all_sigI = torch.zeros(Ncontrast,Ro_len*nshots_sel*nslices, dtype=torch.cdouble)
+    all_omega = torch.zeros(Ncontrast,2,Ro_len*nshots_sel*nslices)
+    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*nshots_sel*nslices, dtype=torch.cdouble)
 
     
     for ii in range(len(bin_bots)):
@@ -294,7 +301,8 @@ def load_sliceDataNonCart(dataset_name='tubes'):
 
 #     kspace_oneXslice = kspace_FTx_echos[slice_x,:,:,:,:]
 #     kdata = np.transpose(kspace_oneXslice, (3,2,0,1))
-    kspace_norm_fact = torch.max(torch.abs(all_sigI))*100
+#JBM  a note of warning: the normalization factor above does really impact performance...
+    kspace_norm_fact = torch.max(torch.abs(all_sigI))/10#*100
     all_sigI = all_sigI / kspace_norm_fact # k-space normalization (same for all slices)
 #     kdim = kspace_FTx_echos.shape
     
@@ -314,7 +322,7 @@ def load_sliceDataNonCart(dataset_name='tubes'):
         'undersample_mask': None, # delete
         'runname': 'JBM_testing_noncart_7skip_LARGE_REG',
         'slice_x': 0,
-        'im_size': [100,100],
+        'im_size': [dim,dim],
         'out_dim': out_dim,
         'kspace_norm_fact': kspace_norm_fact #JBM: maybe need to be careful about how we normalize/denormalize kspace...
     }

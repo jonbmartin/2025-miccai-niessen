@@ -46,28 +46,26 @@ class WeightedKspaceMSELossNonCart(nn.Module):
         self.weight = (dist + 1).clone().detach()  # Avoid division by zero
         self.mse = nn.MSELoss()
 
-    def forward(self, img_pred, kdata, all_omega, all_dcomp):
+    def forward(self, img_pred, kdata, all_omega, all_dcomp, all_csm):
         
         # TODO: get images across contrast. perform FORWARD NUFFT.
         # Compute k-space loss with known kdata. 
         
         # JBM issue 1: this is very inefficient looping but just trying to be quick & dirty: 
         # JBM issue 2: that density compensation factoring in feels incorrect. 
-        dim = 100 # should programmatically get this 
-#         print('img_pred device: ', img_pred.get_device())
-#         print('kdata device: ', kdata.get_device())
-#         print('all_omega device: ', all_omega.get_device())
-#         print('all_dcomp device: ', all_dcomp.get_device())
+        dim = 300 # should programmatically get this 
+        Ncontrast = 1 # should programmatically get this 
+
         weight = torch.sqrt((all_omega[:,0,:]*2*torch.pi)**2 + (all_omega[:,1,:]*2*torch.pi)**2)+1
         print('weight shape = ', np.shape(weight))
         loss = 0
         device = img_pred.get_device()
-        for ii in range(9): # JBM TODO hardcoded number of contrasts
-            contrast_img = torch.squeeze(img_pred[:,:,ii])[None,None,:,:]/1000 # JBM try this neext??#
+        for ii in range(Ncontrast): # JBM TODO hardcoded number of contrasts
+            contrast_img = torch.squeeze(img_pred[:,:,ii])[None,None,:,:]#/1000 # JBM try this neext??#
 #             contrast_img = torch.squeeze(img_pred[:,:,ii]) # JBM try this neext??#
 
             kspace_nufft_contrast = nufft2c_torch(contrast_img, 
-                                             all_omega[ii,:,:].squeeze(), None, 
+                                             all_omega[ii,:,:].squeeze(), all_csm, 
                                                   dim,device=device)#*torch.sqrt(all_dcomp[None,ii,:,:])/2/np.pi
             weight_contrast = weight[ii,:].squeeze()
             #/ torch.sqrt(all_dcomp[None,ii,:,:])*torch.pi
@@ -294,10 +292,13 @@ class DirectINRReconstructor():
         n_iter_per_epoch = int(np.ceil(batch_size / batch_size))
         scale = 1
 
+        # grid = torch.stack(torch.meshgrid(
+        #         torch.linspace(-1, 1, int(Vy*scale)+1, device=self.kdata.device)[:-1], 
+        #         torch.linspace(-1, 1, int(Vz*scale)+1, device=self.kdata.device)[:-1], indexing='ij'), dim=-1)  # (nx, Vy, 2)
         grid = torch.stack(torch.meshgrid(
                 torch.linspace(-1, 1, int(Vy*scale)+1, device=self.kdata.device)[:-1], 
                 torch.linspace(-1, 1, int(Vz*scale)+1, device=self.kdata.device)[:-1], indexing='ij'), dim=-1)  # (nx, Vy, 2)
-        
+
 
         for epoch in range(n_epochs):
             loss_epoch = 0
@@ -464,17 +465,19 @@ class DirectINRReconstructorNonCart():
         self.kdata = self.kdata.clone().detach().to(device=self.device, dtype=torch.complex64)
         self.omega = self.omega.clone().detach().to(device=self.device, dtype=torch.float64)
         self.dcomp = self.dcomp.clone().detach().to(device=self.device, dtype=torch.complex64)
+        self.csm = self.csm.clone().detach().to(device=self.device, dtype=torch.complex64) # JBM
 
         # don't need either of the below
 #         self.csm = torch.tensor(self.csm, device=self.device, dtype=torch.complex64)
-#         self.undersample_mask = torch.tensor(self.undersample_mask, device=self.device, dtype=torch.int)
+#         self.undersample_mask = torch.tensor(self.undersample_mask, device=self.devifloat64ce, dtype=torch.int)
 
         n_epochs = train_cfg.n_epochs
         batch_size = train_cfg.batch_size
         val_im_size = self.im_size
 
 #         batch_dim, nTI, nc, Vy, Vz = self.kdata.shape
-        batch_dim, nTI, nc, Vy, Vz = 1, 9, 1, 100, 100 # TODO: JBM hardcoded
+        # batch_dim, nTI, nc, Vy, Vz = 1, 9, 1, 100, 100 # TODO: JBM hardcoded
+        batch_dim, nTI, nc, Vy, Vz = 1, 1, 1, 300, 300 # TODO: JBM hardcoded
         n_iter_per_epoch = int(np.ceil(batch_size / batch_size))
         scale = 1
 
@@ -511,7 +514,7 @@ class DirectINRReconstructorNonCart():
 #                 kdata = self.kdata.detach().clone()
 #                 omega = self.omega.detach().clone()
 #                 dcomp = self.dcomp.detach().clone()
-                loss_dc = self.loss(img_pred, self.kdata, self.omega, self.dcomp)
+                loss_dc = self.loss(img_pred, self.kdata, self.omega, self.dcomp, self.csm)
                 loss = loss_dc
 
                 loss.backward()
@@ -528,7 +531,11 @@ class DirectINRReconstructorNonCart():
             
             if epoch == n_epochs-1:
                 img = self.validate(val_im_size, nTI)
-                return img.squeeze().cpu().clone().detach().numpy()
+                img_out = img.squeeze().cpu().clone().detach().numpy()
+                # JBM added below to make sure that last dim doesn't get squeezed away to nothing in 1 case
+                if nTI == 1:
+                    img_out = img_out[:,:,None]
+                return img_out
 
 
 
