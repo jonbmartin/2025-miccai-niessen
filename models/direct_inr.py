@@ -465,7 +465,8 @@ class DirectINRReconstructorNonCart():
         self.kdata = self.kdata.clone().detach().to(device=self.device, dtype=torch.complex64)
         self.omega = self.omega.clone().detach().to(device=self.device, dtype=torch.float64)
         self.dcomp = self.dcomp.clone().detach().to(device=self.device, dtype=torch.complex64)
-        self.csm = self.csm.clone().detach().to(device=self.device, dtype=torch.complex64) # JBM
+        if self.csm is not None:
+            self.csm = self.csm.clone().detach().to(device=self.device, dtype=torch.complex64) # JBM
 
         # don't need either of the below
 #         self.csm = torch.tensor(self.csm, device=self.device, dtype=torch.complex64)

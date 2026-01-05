@@ -246,12 +246,13 @@ def load_sliceDataNonCart(dataset_name='tubes'):
         # JBM: experimentally realized that I also needed a factor of 2 division. was too small
         rosdat['kxI'] = mydat['kx_in']/150/2 # (Ro_len, Nshots)
         rosdat['kyI'] = mydat['ky_in']/150/2 # (Ro_len, Nshots)
-        slice_idx = 45 # middle slice
-        nslices = 20
-        coil_idx = 3 # JBM first coil. will need to extend to multi-coil later
-        csm = mydat['sens_map'][:,:,slice_idx:slice_idx+nslices,0,coil_idx] # (Nx, Ny), coil 1, slice 65
+        slice_idx = 65 # middle slice
+        nslices = 0
+        coil_idx = 1 # JBM first coil. will need to extend to multi-coil later
+        csm = mydat['sens_map'][:,:,slice_idx,0,coil_idx] # (Nx, Ny), coil 1, slice 65
         csm = torch.from_numpy(csm)
-        rosdat['sigI'] = np.squeeze(mydat['kspace_3d_in'][:,:,slice_idx+nslices,:,coil_idx]) # given as (Ro_len, Nshots, Nslice, 1, Ncoils)
+        csm = None
+        rosdat['sigI'] = np.squeeze(mydat['kspace_3d_in'][:,:,slice_idx,:,coil_idx]) # given as (Ro_len, Nshots, Nslice, 1, Ncoils)
         # rosdat['csm'] = mydat['sens_map'][:,:,slice_idx,:,:] # given as (Nx, Ny, Nslice, 1, Ncoils)
     else:
         print('Invalid dataset provided to load_sliceDataNonCart()')
@@ -264,9 +265,9 @@ def load_sliceDataNonCart(dataset_name='tubes'):
     bin_tops = [x+Ro_len for x in bin_bots]
     Ncontrast = len(bin_bots)
     
-    all_sigI = torch.zeros(Ncontrast,Ro_len*nshots_sel*nslices, dtype=torch.cdouble)
-    all_omega = torch.zeros(Ncontrast,2,Ro_len*nshots_sel*nslices)
-    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*nshots_sel*nslices, dtype=torch.cdouble)
+    all_sigI = torch.zeros(Ncontrast,Ro_len*nshots_sel, dtype=torch.cdouble)
+    all_omega = torch.zeros(Ncontrast,2,Ro_len*nshots_sel)
+    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*nshots_sel, dtype=torch.cdouble)
 
     
     for ii in range(len(bin_bots)):
