@@ -359,18 +359,22 @@ class DirectINRReconstructor():
     
     
 class DirectINRReconstructorNonCart():
-    def __init__(self, data, cfg, test=False):
+    def __init__(self, data, cfg, slice_to_recon, test=False):
         r"""
         Args:
             data (dict): input data, must have keys 'kdata', 'csm'
             cfg (OmegaConf): configuration object
         """
+        self.slice_to_recon = slice_to_recon
         self.kdata = data['kdata'] 
         print('just testing in DirectINRReconstructorNonCart, shape of kdata: ', np.shape(self.kdata))
+        self.kdata = self.kdata[:,slice_to_recon,:]  # (nTI, nc, Vy, Vz), np.complex64
         self.csm = data['csm']       
         print('just testing in DirectINRReconstructorNonCart, shape of csm: ', np.shape(self.csm))
         self.dcomp = data['dcomp']
         self.omega = data['omega']
+        self.omega = self.omega[:,slice_to_recon,:,:]  # (nTI, nc, Vy, Vz), np.complex64
+        print('just testing in DirectINRReconstructorNonCart, shape of omega: ', np.shape(self.omega))
         self.reference_img = data['reference_img']
         self.undersample_mask = data['undersample_mask']
         self.im_size = data['im_size']
@@ -466,7 +470,7 @@ class DirectINRReconstructorNonCart():
 
         self.kdata = self.kdata.clone().detach().to(device=self.device, dtype=torch.complex64)
         self.omega = self.omega.clone().detach().to(device=self.device, dtype=torch.float64)
-        self.dcomp = self.dcomp.clone().detach().to(device=self.device, dtype=torch.complex64)
+        # self.dcomp = self.dcomp.clone().detach().to(device=self.device, dtype=torch.complex64)
         if self.csm is not None:
             self.csm = self.csm.clone().detach().to(device=self.device, dtype=torch.complex64) # JBM
 

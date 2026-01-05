@@ -52,12 +52,13 @@ def main(cfg):
     img_allSlices = None
     img_allSlicesCplx = None
     time0 = time.time()
-
-    for slice in range(1):
-        data = load_sliceDataNonCart("lungUTE")
+    Nslices = 70 # hard-coding for now
+    data = load_sliceDataNonCart("lungUTE")
+    for slice in range(Nslices):
+        print('Reconstructing slice: ', slice)
         # create output containers once we know dimensions
         if img_allSlices is None:
-            Nslices = 1
+
             Ncontrasts = data['out_dim']
             print('Ncontrasts = ', Ncontrasts)
             Nx, Ny = data['im_size']
@@ -68,7 +69,7 @@ def main(cfg):
             reconstructor = PICSReconstructor(data,cfg)
             img_slice = reconstructor.run(cfg)
         else:
-            reconstructor = DirectINRReconstructorNonCart(data, cfg)
+            reconstructor = DirectINRReconstructorNonCart(data, cfg, slice_to_recon=slice,)
             img_slice = reconstructor.run(cfg.training.train)
         time2 = time.time()
 
@@ -167,14 +168,14 @@ def load_sliceDataNonCart(dataset_name='tubes'):
         # JBM: experimentally realized that I also needed a factor of 2 division. was too small
         rosdat['kxI'] = mydat['kx_in']/150/2 # (Ro_len, Nshots)
         rosdat['kyI'] = mydat['ky_in']/150/2 # (Ro_len, Nshots)
-        slice_idx = 65 # middle slice
-        nslices = 0
+        slice_idx = 0 # middle slice, 51 through 71 represent shots actually acquired in center of kspace
+        Nslices = 70
         coil_idx = 1 # JBM first coil. will need to extend to multi-coil later
         csm = mydat['sens_map'][:,:,slice_idx,0,coil_idx] # (Nx, Ny), coil 1, slice 65
         csm = torch.from_numpy(csm)
         csm = None
-        rosdat['sigI'] = np.squeeze(mydat['kspace_3d_in'][:,:,slice_idx,:,coil_idx]) # given as (Ro_len, Nshots, Nslice, 1, Ncoils)
-        # rosdat['csm'] = mydat['sens_map'][:,:,slice_idx,:,:] # given as (Nx, Ny, Nslice, 1, Ncoils)
+        rosdat['sigI'] = np.squeeze(mydat['kspace_3d_in'][:,:,slice_idx:slice_idx+Nslices,:,coil_idx]) # given as (Ro_len, Nshots, Nslice, 1, Ncoils)
+        print('shape of sigI loaded:', np.shape(rosdat['sigI']))
     else:
         print('Invalid dataset provided to load_sliceDataNonCart()')
         return
@@ -186,33 +187,39 @@ def load_sliceDataNonCart(dataset_name='tubes'):
     bin_tops = [x+Ro_len for x in bin_bots]
     Ncontrast = len(bin_bots)
     
-    all_sigI = torch.zeros(Ncontrast,Ro_len*nshots_sel, dtype=torch.cdouble)
-    all_omega = torch.zeros(Ncontrast,2,Ro_len*nshots_sel)
-    all_dcomp = torch.zeros(Ncontrast,1,Ro_len*nshots_sel, dtype=torch.cdouble)
+    all_sigI = torch.zeros(Ncontrast,Nslices,Ro_len*nshots_sel, dtype=torch.cdouble)
+    all_omega = torch.zeros(Ncontrast,Nslices,2,Ro_len*nshots_sel)
+    all_dcomp = torch.zeros(Ncontrast,Nslices,1,Ro_len*nshots_sel, dtype=torch.cdouble)
+
 
     
     for ii in range(len(bin_bots)):
-        print('Calc. density comp for segment: ', ii+1)
-        tbot,ttop = bin_bots[ii],bin_tops[ii]
+        for jj in range(Nslices):
+            # print('Calc. density comp for segment: ', ii+1)
+            print('loading slice:', jj)
+            tbot,ttop = bin_bots[ii],bin_tops[ii]
 
-        kx = torch.from_numpy(rosdat['kxI'])[tbot:ttop,shot_idx]
-        ky = torch.from_numpy(rosdat['kyI'])[tbot:ttop,shot_idx]
-        sigI = torch.from_numpy(rosdat['sigI'])[tbot:ttop,shot_idx]
-        omega = torch.stack((ky.flatten(),kx.flatten()),dim=0)
-        omega = omega*2*torch.pi
-        sigI = sigI.flatten()[None,None,:].type(torch.cdouble)
+            # using same kx and ky for all slices... 
+            kx = torch.from_numpy(rosdat['kxI'])[tbot:ttop,shot_idx]
+            ky = torch.from_numpy(rosdat['kyI'])[tbot:ttop,shot_idx]
+            sigI = torch.from_numpy(rosdat['sigI'])[tbot:ttop,shot_idx,jj] # has (Ro, Shot, slice)
 
-        dcomp = tkbn.calc_density_compensation_function(omega, (dim, dim),num_iterations=15)
+            omega = torch.stack((ky.flatten(),kx.flatten()),dim=0)
+            omega = omega*2*torch.pi
+            sigI = sigI.flatten()[None,None,:].type(torch.cdouble)
 
-        all_sigI[ii,:] = sigI
-        all_omega[ii,:,:] = omega
-        all_dcomp[ii,:,:] = dcomp
+        # dcomp = tkbn.calc_density_compensation_function(omega, (dim, dim),num_iterations=15)
+
+            all_sigI[ii,jj,:] = sigI
+            all_omega[ii,jj,:,:] = omega
+            # all_dcomp[ii,jj,:,:] = dcomp
+            all_dcomp = None
         
         # JBM below is just a recon test
-#         img = inufft2c_torch(sigI*dcomp, omega, None,dim)
-#         img = np.squeeze(img)
-#         plt.figure()
-#         plt.imshow(np.squeeze(np.abs(img.numpy())), cmap='gray')
+        # img = inufft2c_torch(sigI*dcomp, omega, None,dim)
+        # img = np.squeeze(img)
+        # plt.figure()
+        # plt.imshow(np.squeeze(np.abs(img.numpy())), cmap='gray')
     
     
     # below is not me
@@ -223,7 +230,7 @@ def load_sliceDataNonCart(dataset_name='tubes'):
 
 #     kspace_oneXslice = kspace_FTx_echos[slice_x,:,:,:,:]
 #     kdata = np.transpose(kspace_oneXslice, (3,2,0,1))
-#JBM  a note of warning: the normalization factor above does really impact performance...
+    # JBM: normalizing here will affect the scale of the image reconstruction.
     kspace_norm_fact = torch.max(torch.abs(all_sigI))/10#*100
     all_sigI = all_sigI / kspace_norm_fact # k-space normalization (same for all slices)
 #     kdim = kspace_FTx_echos.shape
