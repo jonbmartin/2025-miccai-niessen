@@ -45,89 +45,10 @@ def main(cfg):
     ktraj: torch tensor, k-space trajectory, (..., 2, nspokes*nFE)
     dcomp: torch tensor, density compensation, (..., 1, nspokes*nFE)
     '''
-    
-    # -----------JBM: my code for loading in the required  data ------
-    # Note: some weird axis expansions due to me realizing late that y-z is in-plane
-#     dat = sio.loadmat('testdata_INR_multicontrast.mat')
-#     csm = np.repeat(np.repeat(dat['csm'][None,:,:,None],2,axis=3),2,axis=0)
-#     csm = csm.astype(complex)
-#     brain_mask = np.repeat(dat['brain_mask'][None,:,:],2,axis=0)
-#     kspace_loaded = np.repeat(np.repeat(dat['ksp'][None,:,:,None,:],2,axis=3),2,axis=0)
-#     reference_img = np.repeat(np.squeeze(dat['reference_img'])[None,:,:,:],2,axis=0)
-#     print('csm shape = ', np.shape(csm))
-#     print('brain_mask shape = ', np.shape(brain_mask))
-#     print('kspace shape = ', np.shape(kspace_loaded))
-#     print('reference img shape = ', np.shape(reference_img))
-    
-
-# #     # ------------- Perform 1D FFT in kx direction ------------------
-#     kspace_loaded_torch = torch.tensor(kspace_loaded, dtype=torch.complex64)
-#     kdim = kspace_loaded_torch.shape
-#     kspace_FTx_echos = torch.zeros(kdim, dtype=torch.complex64)
-#     num_echos = kdim[-1]
-#     print('num echos = ', num_echos)
-
-#     for echo in range(num_echos):
-#         x = torch.fft.ifftshift(kspace_loaded_torch[:,:,:,:,echo], dim=0)
-#         x = torch.fft.ifft(x, dim=0, norm='ortho')
-#         kspace_FTx_echos[:,:,:,:,echo] = torch.fft.fftshift(x, dim=0)
-
-#     # Get kdim used for individual slice training to create the undersampling mask
-#     kdim_all = kspace_FTx_echos.shape
-#     print('kdim_all =', print(kdim_all))
-#     slice_x = 0 # JBM was 75
-#     kspace_oneXslice = kspace_FTx_echos[slice_x,:,:,:,:]
-#     # Reorder k-space data for training
-#     kdata = np.transpose(kspace_oneXslice, (3,2,0,1))
-#     kdata = kdata[None,:,:,:,:]
-# #     print('new shape of kdim = ', np.shape(kdata))
-# #     print(kdata)
-
-#     kdim = kdata.shape # kDIM IS JUST DIMENSIONS, NOT DATA!! 
-    
-#     # JBM: overwriting the previous. None of the above is necessary
-# #     kdata = np.transpose(kspace_loaded,axes=(0,4,3,1,2))
-# #     kdata = kdata[0,:,:,:,:]
-# #     kdim = kdata.shape
-# #     kdim_all = kdim
-
-
-    # ------------- Create complementary undersampling mask ------------------------------
-
-#     # previously calculated undersampling masks are saved and loaded for comparability between methods
-#     os.makedirs(f"{cfg.data.save_dir}/undersample_masks", exist_ok=True)
-#     mask_name = cfg.data.undersampling.type + '_center1:' +str(cfg.data.undersampling.full_kcenter) + '_accel' + str(cfg.data.undersampling.accel)
-#     mask_file = cfg.data.save_dir + '/undersample_masks/'+ mask_name
-
-#     if os.path.isfile(mask_file):
-#         undersample_mask = np.load(mask_file)
-#     else:
-#         undersample_mask = np.zeros(kdim, dtype=int)
-#         fullcenter_mask = fullysampled_kcenter(undersample_mask,kdim,downsample=cfg.data.undersampling.full_kcenter)
-
-#         if cfg.data.undersampling.type == 'poisson':
-#             print('UNDERSAMPLE MASK SHAPE = ', undersample_mask.shape) # JBM debug
-#             print('kdim= ', kdim) # JBM debug
-#             other_mask = undersampling_PoissonDisk(undersample_mask.shape, kdim, accel=cfg.data.undersampling.accel)
-#         elif cfg.data.undersampling.type == 'rosette':
-#             other_mask = undersampling_Rosette(undersample_mask.shape, kdim)
-#         elif cfg.data.undersampling.type == 'fullysampled':
-#             other_mask = np.ones(kdim,dtype=int)
-#         else:
-#             print('WRONG')
-
-#         undersample_mask = np.maximum(fullcenter_mask, other_mask)
-
-#     full_kspace = kdim[-1]*kdim[-2]
-#     undersampling_samples = np.sum(undersample_mask[0,0,0,:,:] != 0)
-#     R_accel = full_kspace / undersampling_samples
-#     R_accel = round(R_accel,2)
-#     np.save(mask_file, undersample_mask)
 
 
     # ---------------- INR training and inference for all slices ----------------
     
-    # JBM THIS IS THE CORE FUNCTION. DONT NEED ANYTHING ABOVE IT 
     img_allSlices = None
     img_allSlicesCplx = None
     time0 = time.time()

@@ -365,8 +365,10 @@ class DirectINRReconstructorNonCart():
             data (dict): input data, must have keys 'kdata', 'csm'
             cfg (OmegaConf): configuration object
         """
-        self.kdata = data['kdata']   # (nTI, nc, Vy, Vz), np.complex64
-        self.csm = data['csm']       # (nc, Vy, Vz), np.complex64
+        self.kdata = data['kdata'] 
+        print('just testing in DirectINRReconstructorNonCart, shape of kdata: ', np.shape(self.kdata))
+        self.csm = data['csm']       
+        print('just testing in DirectINRReconstructorNonCart, shape of csm: ', np.shape(self.csm))
         self.dcomp = data['dcomp']
         self.omega = data['omega']
         self.reference_img = data['reference_img']
@@ -478,7 +480,7 @@ class DirectINRReconstructorNonCart():
 
 #         batch_dim, nTI, nc, Vy, Vz = self.kdata.shape
         # batch_dim, nTI, nc, Vy, Vz = 1, 9, 1, 100, 100 # TODO: JBM hardcoded
-        batch_dim, nTI, nc, Vy, Vz = 1, 1, 1, 300, 300 # TODO: JBM hardcoded
+        batch_dim, nTI, nc, Vx, Vy, Vz = 1, 1, 1, 1, 300, 300 # TODO: JBM hardcoded
         n_iter_per_epoch = int(np.ceil(batch_size / batch_size))
         scale = 1
 
@@ -540,7 +542,7 @@ class DirectINRReconstructorNonCart():
 
 
 
-    def validate(self, im_size,nTI, osf=1):
+    def validate(self, im_size, nTI, osf=1):
         with torch.no_grad():
             Vy, Vz = im_size
             grid = torch.stack(torch.meshgrid(
