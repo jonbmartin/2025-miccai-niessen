@@ -52,6 +52,14 @@ def nufft3c_torch(data, ktraj, sens, dim, nslice, device):
     #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
 
 
+def nufft2c_torch(data, ktraj, sens, dim, device):
+    # JBM implemented
+    nufft_ob = tkbn.KbNufft(im_size=(dim,dim),device=device)
+    kdata = nufft_ob(data, ktraj, smaps=sens, norm='ortho')
+#     print('nufft Not tested')
+    return kdata
+    #return torch.fft.fftshift(torch.fft.ifft2(torch.fft.ifftshift(data, dim), dim=dim), dim=dim)
+    
 def fft1c_np(data, dim=-1):
     return np.fft.fftshift(np.fft.fft(np.fft.ifftshift(data, axes=dim), norm='ortho', axis=dim), axes=dim)
 
